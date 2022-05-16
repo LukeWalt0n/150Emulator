@@ -1,0 +1,28 @@
+{
+  "tasks": [
+    {
+      "type": "cppbuild",
+      "label": "C/C++: clang build active file",
+      "command": "/usr/bin/clang",
+      "args": [
+        "-fdiagnostics-color=always",
+        "-g",
+        "${workspaceFolder}/main.c",
+        "${workspaceFolder}/emulator.c",
+        "-I${workspaceFolder}",
+        "-o",
+        "${workspaceFolder}/emulator"
+      ],
+      "options": {
+        "cwd": "${fileDirname}"
+      },
+      "problemMatcher": ["$gcc"],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "detail": "compiler: /usr/bin/clang"
+    }
+  ]
+}
+
