@@ -18,6 +18,8 @@ void addi(int i);
 void add(int i);
 void andi(int i);
 void sll(int i);
+void blez(int i);
+void getItypeInfo(int i);
 
 const char *register_str[] = {"$zero",
                               "$at", "$v0", "$v1",
@@ -66,6 +68,8 @@ int add_reg(unsigned int *bytecode, char *reg, int pos){
     
 
 		*bytecode |= (i << pos);
+    
+    
 			return(0);
 		}
 	}
@@ -81,6 +85,7 @@ int add_addr(unsigned int *bytecode, int addr){
 int add_lbl(unsigned int offset, unsigned int *bytecode, char *label){
 	char l[MAX_ARG_LEN+1];
 	int j=0;
+  //Runs back through the program, to find where the loop is.
 	while(j<prog_len){
 		memset(l,0,MAX_ARG_LEN+1);
 		sscanf(&prog[j][0],"%" XSTR(MAX_ARG_LEN) "[^:]:", l);
@@ -191,7 +196,8 @@ int print_registers() {
 
 
 unsigned int func;
-unsigned int src1, src2, dest, shamt, con, sum;
+unsigned int src1, src2, dest, shamt, con, sum, jd;
+
 
 
 /* function to execute bytecode */
@@ -202,7 +208,11 @@ int exec_bytecode() {
   //Bytecodes are stored in text[].
   unsigned int o;
 
-  for(int i =0; i < prog_len; i++){
+  
+  
+  
+
+  for(int i = TEXT_POS(pc); i < prog_len;i++){
 
     //Get the opcode.
     o = (text[i] >> 24) & 0xff;
@@ -216,19 +226,23 @@ int exec_bytecode() {
       getRtypeInfo(i);
 
       if(func == 0x20){
-        //Add function.
         registers[dest] = registers[src1] + registers[src2];
         printf("0x%08x", registers[dest]);
         
+        
       }
       if(func == 0x00){
+        registers[dest] = registers[src1] << shamt;
         printf("The R-type function is sll\n");
+        
       }
       if(func == 0x02){
         printf("The R-type function is srl\n");
+        
       }
       if(func == 0x08){
         printf("The R-type function is jr\n");
+        
         
       }
 
@@ -240,20 +254,34 @@ int exec_bytecode() {
     else{
       //I-type instructions:
       // addi , andi , blez , bne , 
+      getItypeInfo(i);
       switch(o){
-
           case 0x20:
+
             addi(i);
+            
             break;
           case 0x30:
             //andi(i);
+            
             break;
-          case 0x00:
-            sll(i);
+          case 0x19:
+            blez(i);
+
             break;
+          case 0x14:
+            //bne
+            
+            break;
+          
 
 
       }
+      if(i == -1){
+          printf("Final Result: 0x%08x\n", registers[4]);
+          break;
+      }
+      
     }
   }
 
@@ -270,19 +298,45 @@ void getRtypeInfo(int i){
 }
 
 void getItypeInfo(int i){
-  con = text[i] & 0
+  con = text[i] & 0xff;
+  dest = (text[i] >> 16) & 0xf;
+  src1 = (text[i] >> 12 ) & 0xf;
+  
+
+}
+
+void getJtypeInfo(int i){
+
+}
+
+void andi(int i){
+
 }
 
 void addi(int i){
-  dest = (text[i] >> 16) & 0xf;
-  src1 = (text[i] >> 12 ) & 0xf;
-  con = text[i] & 0xff;
   registers[dest] = registers[src1] + con;
 }
 
-void sll(int i){
+void blez(int i){
+  //Branch less than or equal too.
+  con = text[i] & 0xf;
+  printf("0x%08x\n", con);
 
+  
+
+  
+
+  int addr = ADDR_POS(0xfffffffd);
+  printf("0x%08x\n", addr);
+  
+  
+
+
+    
+   
 }
+
+
 
 
 
@@ -310,6 +364,7 @@ int make_bytecode() {
     bytecode = 0;
 
     if (strchr(&prog[j][0], ':')) { // check if the line contains a label
+      
       if (sscanf(
               &prog[j][0],
               "%" XSTR(MAX_ARG_LEN) "[^:]: %" XSTR(MAX_ARG_LEN) "s %" XSTR(
