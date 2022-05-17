@@ -11,7 +11,7 @@ void usage() {
 
 int main(int argc, char **argv)
 {
-    char *filename = "simple_loop.asm", opt;
+    char *filename = "eth_mult.asm", opt;
     while((opt = getopt(argc, argv, "i:h")) != -1)
     {
         switch(opt)
