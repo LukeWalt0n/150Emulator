@@ -1,3 +1,3 @@
-addi $a0 $zero 100
-addi $a1 $zero 20
-add $t0 $a0 $a1
+addi $a3 $zero 100
+addi $s3 $zero 20
+add $t5 $a3 $s3

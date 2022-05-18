@@ -219,7 +219,7 @@ int exec_bytecode() {
     //Get the opcode.
     o = (text[i] >> 24) & 0xff;
     
-    printf("%d: %s --> OPCODE: 0x%02x\n", i, &prog[i][0], o);
+    //printf("%d: %s --> OPCODE: 0x%02x\n", i, &prog[i][0], o);
     
     
 
@@ -262,8 +262,13 @@ int exec_bytecode() {
         func = text[i] & 0xff;
         
         if(func == 0x20){
+          
           registers[dest] = registers[src1] + registers[src2];
-          printf("0x%08x", registers[dest]);
+          printf("Destination Register: %s\n", register_str[dest]);
+          printf("Source 1 Register: %s\n", register_str[src1]);
+          printf("Source 2 Register: %s\n", register_str[src2]);
+          printf("0x%08x\n", registers[dest]);
+          print_registers();
           i++;
         }
       }
@@ -291,7 +296,7 @@ int exec_bytecode() {
 
           case 0x19:
             i = blez(i);
-            printf("I is currently : %d\n", i);
+            //printf("I is currently : %d\n", i);
             break;
 
           case 0x14:
@@ -326,21 +331,38 @@ int exec_bytecode() {
 }
 
 
+unsigned createMask(unsigned a, unsigned b)
+{
+   unsigned r = 0;
+   for (unsigned i=a; i<=b; i++)
+       r |= 1 << i;
+
+   return r;
+}
+
 void getRtypeInfo(int i){
-  //printf("Get R type information\n");
-  
-  func = text[i] & 0xf;
-  shamt = (text[i] >> 8) & 0xf;
-  src2 = (text[i] >> 12) & 0xf;
-  src1 = (text[i] >> 16) & 0xf;
-  dest = (text[i] >> 20) & 0xf;
+  printf("Get R type information\n");
+  func = createMask(0, 6) & text[i];
+  printf("FUNC: 0x%08x\n", func);
+
+  shamt = createMask(7, 11) & text[i];
+  printf("SHAMT: 0x%08x\n", shamt);
+
+  src2 = createMask(12, 16) & text[i];
+  printf("SRC2: 0x%08x\n", src2);
+
+  src1 = createMask(17, 21) & text[i];
+  printf("SRC1: 0x%08x\n", src1);
+
+  dest = createMask(22, 26) & text[i];
+  printf("DEST: 0x%08x\n", dest);
 }
 
 void getItypeInfo(int i){
-  //printf("Get I Type information\n");
-  con = text[i] & 0xff;
-  dest = (text[i] >> 16) & 0xf;
-  src1 = (text[i] >> 21 ) & 0xf;
+  printf("Get I Type information\n");
+  con = text[i] & 0xffff;
+  dest = (text[i] >> 16) & 0x001f;   //rt
+  src1 = (text[i] >> 21 ) & 0x03e;   //rs
   //printf("%s")
 }
 
@@ -372,7 +394,7 @@ int blez(int i){
   else{
     //printf("RETURN ADDRESS: 0x%08x\n", _POS(currentPos + ((-65536+con))));
 
-    return TEXT_POS(currentPos + ((-65536+con)));
+    return TEXT_POS(currentPos + ((-65536+con)))-1;
   }
   
 }
