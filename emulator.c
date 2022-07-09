@@ -9,8 +9,8 @@
 #define STR(x) #x
 
 #define ADDR_TEXT    0x00400000 //where the .text area starts in which the program lives
-#define TEXT_POS(a)  ((a==ADDR_TEXT)?(0):(a - ADDR_TEXT)/4) //can be used to access text[]
-#define ADDR_POS(j)  (j*4 + ADDR_TEXT)                      //convert text index to address
+#define TEXT_POS(a)  (((a)==ADDR_TEXT)?(0):((a) - ADDR_TEXT)/4) //can be used to access text[]
+#define ADDR_POS(j)  ((j)*4 + ADDR_TEXT)                      //convert text index to address
 
 
 void getRtypeInfo(int i);
@@ -197,220 +197,186 @@ int print_registers() {
 
 
 unsigned int func;
-unsigned int src1, src2, dest, shamt, sum, jd;
-signed int con;
+//rd = destination, rs/rt = source
+unsigned int rs, rt, rd, shamt, sum, jd;
+unsigned int con;
 
-
-
-/* function to execute bytecode */
-int exec_bytecode() {
-
-  printf("EXECUTING PROGRAM ...\n");
-  pc = ADDR_TEXT; // set program counter to the start of our program
-  //Bytecodes are stored in text[].
-  unsigned int o;
-
-  
+int exec_bytecode(){
     
-
-  
-  for(int i = TEXT_POS(pc); i < prog_len;){
-
-    //Get the opcode.
-    o = (text[i] >> 24) & 0xff;
+    printf("EXECUTING PROGRAM ...\n");
+    pc = ADDR_TEXT; // set program counter to the start of our program
     
-    //printf("%d: %s --> OPCODE: 0x%02x\n", i, &prog[i][0], o);
+    //Bytecodes are stored in text[].
+
+    unsigned int o;
+    int i =0;
     
     
+    do{
+      
+      printf("Executing: 0x%08x  0x%08x\n",  ADDR_TEXT+4*TEXT_POS(pc), text[TEXT_POS(pc)]);
 
 
-    //If the opcode is 0x00, it is R type
-    if(o == 0x00){
+      if((text[TEXT_POS(pc)] & 0xFC000000) == 0x20000000){
+          //addi
+          //Get Constant
+          char con2;
+          con2 = (int)(text[TEXT_POS(pc)] & 0x0000FFFF);
+          //get source and address
+          rd = ((text[TEXT_POS(pc)] & 0x001f0000) >> 16);
+          rs = ((text[TEXT_POS(pc)] & 0x03e00000) >> 21);
 
-      getRtypeInfo(i);
-    
-      if(func == 0x0){
-        //sll
-        //Have to handle bytecodes differently for each function other than just 
-        shamt = ((text[i] >> 8) & 0xff) /32;
-        dest = ((text[i] >> 12) & 0xf) * 2;
-        src2 = (text[i] >> 16) & 0xf;
-        src1 = (text[i] >> 20) & 0xf;
+          //Do addi calculations
+          registers[rd] = registers[rs] + con2;
+          //Increment to next instructions
+          pc = pc +4;
 
-        registers[dest] = registers[src2] << shamt;
-        //printf("The R-type function is sll\n");
-        //printf("Destination register: %s  value: 0x%04x       Src1 Register: %s  value: 0x%04x           SHAMT: %d\n", 
-         //register_str[dest], registers[dest], register_str[src2], registers[src2], shamt);
-        i++;
+    }
+      else if((text[TEXT_POS(pc)] & 0xFC000000) == 0x18000000){
+        //BLEZ
+	   
+	  //Create con2 to have as a char so is 4.
+          char con2;
+          //Cast as an int, use a mask to get the first 16 bits.
+          con2 = (int)(text[TEXT_POS(pc)] & 0x0000FFFF);
+          rd = ((text[TEXT_POS(pc)] & 0x001f0000) >> 16);
+          rs = ((text[TEXT_POS(pc)] & 0x03e00000) >> 21);
+          
+          //Check if the source register is less than or equal to 0.
+          if(registers[rs] <= 0 ){
+            //Have pc2 so we can have it as an int to avoid sign issues.
+            int pc2;
+            //Pc2 = current address + (con2 * 4) which gives us the address to branch to.
+            pc2 = pc + (con2*4);
+            pc = pc2+4;
+          }
+          else{
+            //Else go to the next address.
+            pc = pc+4;
+          
+          }
+
+    }
+    else if((text[TEXT_POS(pc)] & 0xFC000000) == 0x14000000){
+      //bne
+      char con2;
+      con2 = (int)(text[TEXT_POS(pc)] & 0x0000FFFF);
+      rd = ((text[TEXT_POS(pc)] & 0x001f0000) >> 16);
+      rs = ((text[TEXT_POS(pc)] & 0x03e00000) >> 21);
+
+      //printf("rd: %s       and rs: %s\n", register_str[rd], register_str[rs]);
+      //printf("Comparing values: %d  and %d\n", registers[rd], registers[rs]);
+	  
+	  //Check if the regsiters are not equal.
+          if(registers[rd] != registers[rs]){
+            //Same caluclation as before.
+            int pc2;
+            pc2 = pc + (con2*4);
+            pc = pc2+4;
+      
+          }
+          else{
+          //Else increment to next instruction.
+            pc = pc +4;
+          }
+          
+          
+
+    }
+    else if((text[TEXT_POS(pc)] & 0xFC000000) == 0x30000000){
+      //andi
+      
+      char con2;
+      con2 = (int)(text[TEXT_POS(pc)] & 0x0000FFFF);
+      rd = ((text[TEXT_POS(pc)] & 0x001f0000) >> 16);
+      rs = ((text[TEXT_POS(pc)] & 0x03e00000) >> 21);
+      
+      // & the source register and the constant together.
+      registers[rd] = registers[rs] & con2;
+      //Increment to the next address.
+      pc = pc +4;
         
-        
-      }
-      if(func == 0x2){
-        printf("The R-type function is srl\n");
-        i++;
-        
-        
-      }
-      if(func == 0x8){
-        printf("The R-type function is jr\n");
-        i++;
-        
+
+    }
+    else{
+      //Must be R type or J type.
+      //Get the function type.
+      
+      if((text[TEXT_POS(pc)] & 0xFC000000) == 0x0C000000){
+          //Code for JAL
+          
+          int pc2;
+          char con2;
+
+          con2 = (int)(text[TEXT_POS(pc)] & 0x03FFFFFF);
+          
+          //Set ra to be the current index, 
+          registers[31] = pc+4;
+          
+          pc2 = pc + (con2*4);
+          pc = pc2+8;
+          
+          
+
+          // jal label
+          //Constant = label pointing which address to go to.
+          // $ra = current text position = TEXT_POS(pc)
+
+          
+
       }
       else{
-        //If it cannot find the func for any where the last digit is the func, then it may be add so check.
-        //Get the two last digits e.g., 0x000000020.
-        func = text[i] & 0xff;
+        //Must be R-type so:
         
-        if(func == 0x20){
-          
-          registers[dest] = registers[src1] + registers[src2];
-          printf("Destination Register: %s\n", register_str[dest]);
-          printf("Source 1 Register: %s\n", register_str[src1]);
-          printf("Source 2 Register: %s\n", register_str[src2]);
-          printf("0x%08x\n", registers[dest]);
-          print_registers();
-          i++;
+        //Get each of the R-type components.
+        func =  text[TEXT_POS(pc)] & 0x0000003f;
+        shamt = ((text[TEXT_POS(pc)] & 0x000007C0) >> 6);
+        rd = ((text[TEXT_POS(pc)] & 0x0000F800) >> 11);
+        rt = ((text[TEXT_POS(pc)] & 0x001F0000) >> 16);
+        rs = ((text[TEXT_POS(pc)] & 0x03e00000) >> 21);
+
+        if(func == 0x000000020){
+              //Add function
+              //printf("ADD\n");
+              //printf("Rd = %s,  Rs = %s, Rt = %s\n", register_str[rd], register_str[rs], register_str[rt]);
+              registers[rd] = registers[rs] + registers[rt];
+              pc = pc +4;
+              
+              
         }
-      }
-    
+        else if(func == 0x00000000){
+            //sll
+            //printf("SLL\n");
+            registers[rd] = registers[rt] << shamt;
+            pc = pc +4;
 
-
-    }
-    else if(o == 0x03){
-      //Jump and link option
-    }
-    else{
-      //I-type instructions:
-      // addi , andi , blez , bne , 
-      getItypeInfo(i);
-      switch(o){
-          case 0x20:
-            addi(i);
-            i++;
-            break;
-
-          case 0x30:
-            andi(i);
-            i++;
-            break;
-
-          case 0x19:
-            i = blez(i);
-            //printf("I is currently : %d\n", i);
-            break;
-
-          case 0x14:
-            //bne
-            src1 = ((text[i] >> 20) & 0xf)/2;
-            src2 = (text[i] >> 16) & 0xf;
-            i = bne(i);
-            break;
-
-          case 0x21:
-          //Special case for negative numbers??
-            dest = (text[i] >> 16) & 0xf;
-            con = text[i] & 0xffff;
-            con = -(65536 - con);
-            addi(i);
-            i++;
-            break;
-          
-
+        }
+        else if(func == 0x00000002){
+          //srl
+          //printf("SRL\n");
+            registers[rd] = registers[rt] >> shamt;
+            pc = pc +4;
+        }
+        else if(func == 0x00000008){
+            //JR
+            //printf("JR\n");
+            pc = registers[31];
+        }
 
       }
-      if(i == -1){
-          print_registers();
+       
 
-          break;
-      }
+      
+      
       
     }
-  }
-
-  return (0);
-}
-
-
-unsigned createMask(unsigned a, unsigned b)
-{
-   unsigned r = 0;
-   for (unsigned i=a; i<=b; i++)
-       r |= 1 << i;
-
-   return r;
-}
-
-void getRtypeInfo(int i){
-  printf("Get R type information\n");
-  func = createMask(0, 6) & text[i];
-  printf("FUNC: 0x%08x\n", func);
-
-  shamt = createMask(7, 11) & text[i];
-  printf("SHAMT: 0x%08x\n", shamt);
-
-  src2 = createMask(12, 16) & text[i];
-  printf("SRC2: 0x%08x\n", src2);
-
-  src1 = createMask(17, 21) & text[i];
-  printf("SRC1: 0x%08x\n", src1);
-
-  dest = createMask(22, 26) & text[i];
-  printf("DEST: 0x%08x\n", dest);
-}
-
-void getItypeInfo(int i){
-  printf("Get I Type information\n");
-  con = text[i] & 0xffff;
-  dest = (text[i] >> 16) & 0x001f;   //rt
-  src1 = (text[i] >> 21 ) & 0x03e;   //rs
-  //printf("%s")
-}
-
-void getJtypeInfo(int i){
-
-}
-
-void andi(int i){
-    src1 = ((text[i] >> 20) & 0xf)/2;
-    dest = (text[i] >> 16 & 0xf);
-    con = text[i] & 0xff;
-    //printf("Dest: %d, src1: %d, con: %d\n", dest, src1, con);
-    registers[dest] = (registers[src1]&con);
-
-}
-
-void addi(int i){
-  registers[dest] = registers[src1] + con;
-}
-
-int blez(int i){
- 
-  con = text[i] & 0xffff;
-  unsigned int currentPos = ADDR_POS(i);
+  }while(text[TEXT_POS(pc)] != 0);
   
-  if(registers[src1] <= 0){
-    return -1;
-  }
-  else{
-    //printf("RETURN ADDRESS: 0x%08x\n", _POS(currentPos + ((-65536+con))));
+  print_registers();
+    
+}
 
-    return TEXT_POS(currentPos + ((-65536+con)))-1;
-  }
   
-}
-
-int bne(int i){
-    con = text[i] & 0xffff;
-    unsigned int currentPos = ADDR_POS(i);
-
-    //If the two values are equal, then return -1.
-    if(registers[src1] == registers[src2]){
-      return -1;
-    }
-    else{
-      return TEXT_POS(currentPos + ((-65536+con)));
-    }
-}
 
 
 
